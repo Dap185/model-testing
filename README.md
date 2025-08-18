@@ -1,3 +1,32 @@
 # LLM Model Testing
 
 This repository is dedicated to testing the speed and performance of various Large Language Models (LLMs) for socratic tutoring. The goal is to benchmark different models, compare their performance, and document the results for future reference.
+
+## Running the Tests
+
+1. Clone this repository:
+    ```bash
+    git clone <repository-url>
+    cd model-testing
+    ```
+
+2. Install dependencies:
+    ```bash
+    pip install -r requirements.txt
+    ```
+
+3. Run the program:
+    ```bash
+    python app.py
+    ```
+
+4. Open "http://127.0.0.1:5500" to interact
+
+
+## TODO
+
+1. Add a few more models
+
+2. Draw up interface to configure decmla point use case
+
+3. Add tokens analytics (for cost analysis)
