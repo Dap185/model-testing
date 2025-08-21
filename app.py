@@ -70,7 +70,7 @@ def test_prompt():
         response, status = anthropic_routine(api_key, model, prompt)
     elif model.startswith('gemini'):
         # Placeholder for Gemini API call
-        return jsonify({'error': 'Gemini model not implemented yet'}), 501
+        response, status = gemini_routine(api_key, model, prompt)
     else:
         return jsonify({'error': f'Model not found {model}'}), 500
     print(f"recording data, response was {response}")
@@ -140,6 +140,19 @@ def anthropic_routine(api_key, model, prompt):
 
 
 
+
+
+def gemini_routine(api_key, model, prompt):
+    """Call gemini api with the provided model and prompt"""
+    client = OpenAI(
+        api_key=api_key,
+        base_url="https://generativelanguage.googleapis.com/v1beta/openai/"
+    )
+
+    response = client.chat.completions.create(
+        model=model,
+        messages=prompt
+    )
 
 
 
