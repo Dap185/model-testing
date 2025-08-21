@@ -31,7 +31,7 @@ async function sendRequest() {
 
   let data = {
     model: model,
-    message: promptValue
+    messages: [{role:"user", contents: promptValue}]
   };
 
   try {
