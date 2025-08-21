@@ -110,7 +110,6 @@ def openai_routine(api_key, model, prompt):
 def anthropic_routine(api_key, model, prompt):
     """Call Anthropic API with the provided model and prompt."""
     client = Anthropic(api_key=api_key)
-    print(f"prompt from anthropic routine {prompt[0]}")
     try:
         start_time = time.time()
         response = client.messages.create(
@@ -118,7 +117,6 @@ def anthropic_routine(api_key, model, prompt):
             max_tokens=1000,
             system=prompt[0]['content'] if isinstance(prompt[0], dict) else prompt[0],
             temperature=0.7,
-            top_p=1,
             messages=prompt[1:],
         )
         end_time = time.time()
@@ -148,11 +146,20 @@ def gemini_routine(api_key, model, prompt):
         api_key=api_key,
         base_url="https://generativelanguage.googleapis.com/v1beta/openai/"
     )
-
+    start_time = time.time()
     response = client.chat.completions.create(
         model=model,
         messages=prompt
     )
+    end_time = time.time()
+    time_elapsed = end_time - start_time
+    print("Gemini Response:", response.choices[0].message.content)
+    return {  
+        'model': model,
+        'prompt': prompt,
+        'response': response.choices[0].message.content,
+        'time_elapsed': time_elapsed
+    }, 200
 
 
 
