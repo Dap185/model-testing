@@ -29,6 +29,6 @@ This repository is dedicated to testing the speed and performance of various Lar
 
 1. Add a few more models
 
-2. Draw up interface to configure decmla point use case
+2. Draw up interfaces for other decimal point level types (3 others)
 
 3. Add tokens analytics (for cost analysis)
