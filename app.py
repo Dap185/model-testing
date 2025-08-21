@@ -2,9 +2,13 @@ from flask import Flask, request, jsonify, render_template
 #permit cross-origin requests from frontend
 from flask_cors import CORS
 
+
 import time
 import os
 import pandas as pd
+
+from dotenv import load_dotenv
+
 
 from openai import OpenAI
 from anthropic import Anthropic, HUMAN_PROMPT, AI_PROMPT
@@ -12,50 +16,63 @@ from anthropic import Anthropic, HUMAN_PROMPT, AI_PROMPT
 #set your output csv file
 CSV_FILE = './data.csv'
 
-"""grab keys"""
-def get_anthropic_key():
-    with open('keys/anthropic_api_key', 'r') as f:
-        return f.read().strip()
-
-def get_openai_key():
-    with open('keys/openai_api_key', 'r') as f:
-        return f.read().strip()
-
 """Initialize Flask app"""
 app = Flask(__name__, static_folder='static', template_folder='templates')
 CORS(app, origins=["http://127.0.0.1:5500", "http://localhost:5500"])
 
+load_dotenv()
+
 @app.route('/')
 def home():
-    return render_template('index.html')
+    return render_template('home.html')
+
+@app.route('/custom')
+def custom():
+    return render_template('customPrompt.html')
+
+@app.route('/adding')
+def adding():
+    return render_template('adding.html')
+
+@app.route('/numberline')
+def numberline():
+    return render_template('numberline.html')
 
 @app.route('/api/testPrompt', methods=['POST'])
 def test_prompt():
     """Endpoint to test a prompt with a specified model."""
     data = request.get_json(force=True)
-    prompt = data.get('message', '')
+    
+    prompt = data.get('messages', '')
     if not prompt:
         return jsonify({'error': 'No prompt provided'}), 400
 
     model = data.get('model', '')
-    print(f'Using model: {model}, using prompt: {prompt}')   
     if not model:
         return jsonify({'error': 'No model provided'}), 400
-    print(f"testing prompt, model: {model}, prompt: {prompt}")
+    
     api_key = ''
     response = ''
     if model.startswith('gpt'):
-        api_key = get_openai_key()
-    elif model.startswith('Claude'):
-        api_key = get_anthropic_key()
-    
+        api_key = os.getenv('OPENAI_API_KEY')
+    elif model.startswith('claude'):
+        api_key = os.getenv('ANTHROPIC_API_KEY')
+    elif model.startswith('gemini'):
+        api_key = os.getenv('GEMINI_API_KEY')
+    else:
+        return jsonify({'error': f'Model not found {model}'}), 500
     if not api_key:
-        return jsonify({'error': 'OpenAI API key not found'}), 500
+        return jsonify({'error': 'Key not found in env'}), 500
 
     if model.startswith('gpt'):
         response, status = openai_routine(api_key, model, prompt)
-    elif model.startswith('Claude'):
+    elif model.startswith('claude'):
         response, status = anthropic_routine(api_key, model, prompt)
+    elif model.startswith('gemini'):
+        # Placeholder for Gemini API call
+        return jsonify({'error': 'Gemini model not implemented yet'}), 501
+    else:
+        return jsonify({'error': f'Model not found {model}'}), 500
     print(f"recording data, response was {response}")
     record_data(response)
 
@@ -72,7 +89,7 @@ def openai_routine(api_key, model, prompt):
         start_time = time.time()
         response = client.chat.completions.create(
             model=model,
-            messages=[{"role": "user", "content": prompt}]
+            messages=prompt
         )
         end_time = time.time()
         time_elapsed = end_time - start_time
@@ -93,23 +110,27 @@ def openai_routine(api_key, model, prompt):
 def anthropic_routine(api_key, model, prompt):
     """Call Anthropic API with the provided model and prompt."""
     client = Anthropic(api_key=api_key)
+    print(f"prompt from anthropic routine {prompt[0]}")
     try:
         start_time = time.time()
-        response = client.completions.create(
+        response = client.messages.create(
             model=model,
-            prompt=f"{HUMAN_PROMPT} {prompt} {AI_PROMPT}",
             max_tokens=1000,
+            system=prompt[0]['content'] if isinstance(prompt[0], dict) else prompt[0],
             temperature=0.7,
             top_p=1,
-            stop_sequences=[HUMAN_PROMPT],
+            messages=prompt[1:],
         )
         end_time = time.time()
         time_elapsed = end_time - start_time
-        print("Anthropic Response:", response['completion'])
+        text_response = "".join(
+            block.text for block in response.content if block.type == "text"
+        )
+        print("Anthropic Response:", text_response)
         return {
             'model': model,
             'prompt': prompt,
-            'response': response['completion'],
+            'response': text_response,
             'time_elapsed': time_elapsed
         }, 200
     except Exception as e:

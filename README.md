@@ -20,8 +20,10 @@ This repository is dedicated to testing the speed and performance of various Lar
     python app.py
     ```
 
-4. Open "http://127.0.0.1:5500" to interact
+4. Open "http://127.0.0.1:5000" to interact
 
+5. http://127.0.0.1:5000/adding lets you test the adding prompts as they exist in DP
+    http://127.0.0.1:5000/custom lets you test whatever prompts you want
 
 ## TODO
 

@@ -1,12 +1,12 @@
-console.log("JS loaded correctly");
-window.addEventListener("beforeunload", () => {
-  console.log("Page is reloading!");
-});
-
-
+/**
+ * Custom Prompt page frontend logic 
+ */
 let model = "gpt-4o-mini"; // Default model
-let message = "";
+let misconception = "";
 
+/**
+ * Initialize interface events codewise logic
+ */
 window.addEventListener("DOMContentLoaded", function () {
   // Model selector
   document.getElementById("model-select").addEventListener("change", function (event) {
@@ -14,7 +14,7 @@ window.addEventListener("DOMContentLoaded", function () {
   });
 
   // Prompt input
-  document.getElementById("prompt-input").addEventListener("input", function (event) {
+  document.getElementById("prompt-input").addEventListener("change", function (event) {
     message = event.target.value;
   });
 
@@ -22,6 +22,9 @@ window.addEventListener("DOMContentLoaded", function () {
   document.getElementById("send-btn").addEventListener("click", sendRequest);
 });
 
+/**
+ * Send request to backend with the current model and prompt
+ */
 async function sendRequest() {
   // Always grab latest value in case user typed but event didn’t fire
   const promptValue = document.getElementById("prompt-input").value;
@@ -52,31 +55,3 @@ async function sendRequest() {
   }
 }
 
-function updateTable(result) {
-  const tableBody = document.querySelector("#history-table tbody");
-  const row = document.createElement("tr");
-
-  // Model
-  const modelCell = document.createElement("td");
-  modelCell.textContent = result.model || "";
-  row.appendChild(modelCell);
-
-  // Prompt
-  const promptCell = document.createElement("td");
-  promptCell.textContent = result.prompt || "";
-  row.appendChild(promptCell);
-
-  // Response
-  const responseCell = document.createElement("td");
-  responseCell.textContent = result.response || "";
-  row.appendChild(responseCell);
-
-  // Time Elapsed
-  const timeCell = document.createElement("td");
-  timeCell.textContent = (result.time_elapsed !== undefined)
-    ? result.time_elapsed.toFixed(3) + "s"
-    : "";
-  row.appendChild(timeCell);
-
-  tableBody.appendChild(row);
-}

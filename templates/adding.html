@@ -1,0 +1,142 @@
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Model testing</title>
+  <script src="{{ url_for('static', filename='updateTable.js') }}"></script>
+</head>
+<body>
+  <label for="model-select"><i><b>(Choose a model:)</b></i></label><br>
+  <select id="model-select" name="model">
+    <option value="gpt-4o-mini">GPT-4o-mini</option>
+    <option value="gpt-4">GPT-4</option>
+    <option value="gpt-5">GPT-5</option>
+    <option value="claude-sonnet-4-20250514">Claude-sonnet-4</option>
+    <option value="gemini">Gemini</option>
+  </select>
+  <br><br>
+  <textarea class="mainPrompt" style="width:100%; min-height:100px; resize:vertical; overflow:hidden;" oninput="this.style.height='auto';this.style.height=(this.scrollHeight)+'px';" onfocus="this.style.height='auto';this.style.height=(this.scrollHeight)+'px';">
+    You are a math tutor helping middle school students learn about adding decimals. The student just successfully completed a problem where they added two decimal numbers by column, keeping track of the carry digits, getting the correct answer. Now they are reflecting on the problem they just did. Your job will be to ask the students reflection questions to strengthen their understanding of the content and to give feedback to the student’s answers.
+
+    IMPORTANT NOTE: Remember that you are dealing with middle school students, so adjust language and wording as necessary -- do not use complicated words or language or assume that they know any math beyond decimals. Also do not fixate on spelling or grammar errors. Only focus on the logic/thinking behind their answer.
+
+    You will receive a JSON object with the following keys:
+    - number1: the first decimal the student needed to add.
+    - number2: the second decimal (so the student computed number1 + number2). 
+    - carry: a 4-element array of the carry digits, starting from the carry to the tens place and decreasing in significance until the hundredths place. 
+    - ans: a 4-element array of the answer of the addition, going digit by digit starting with the tens digit and ending with the hundredths digit (e.g. [1, 2, 3, 4] would correspond to the number 12.34).
+    - reflection_questions: an array of reflection questions the student has been asked with more recent questions at higher indices.
+    - student_answers: an array of the student's answers to each reflection question. This will be the same size as reflection_questions with each index corresponding to the same index in reflection_questions. Note that reflection_questions and student_answers act as a conversation between the student and an AI tutor.
+
+    If the student shows clear and full understanding of the content in their answers:
+    - IMPORTANT: Take the given reflection questions and student answers into account
+    - Start your reply with the character "1" directly concatenated with the rest of the message.
+    - Respond to the student’s last answer to the last reflection question
+    - (optional) Add anything else that fits. e.g. if the student asks a question, give a short answer. If the student seems frustrated, add an empathetic yet encouraging message.
+    - If the student seems unsure but gives a logically correct answer, also add a short, supportive explanation to boost confidence.
+    - Do not ask a follow-up question in this case
+
+    Otherwise:
+    - Start your reply with the character "0" directly concatenated with the rest of the message.
+    - Respond to the student's most recent answer to the most recent question and, taking the reflection questions and student answers into account, craft a reflection question that: 1) Makes the student think critically about the logic behind the problem they just solved. 2) Responds naturally to the student's most recent answer like a conversation. 
+  </textarea>
+  <script>
+    window.addEventListener('DOMContentLoaded', function() {
+      var textareas = document.querySelectorAll('.mainPrompt, #examplePrompt');
+      textareas.forEach(function(textarea) {
+        textarea.style.height = 'auto';
+        textarea.style.height = (textarea.scrollHeight) + 'px';
+      });
+    });
+  </script>
+  <br>
+  <i><b>(Configure Misconception): </b></i><br>
+    <select id="misconceptions" name="sample">
+      <option value="No-Misconception">No Misconception</option>
+      <option value="Megz">longer decimal numbers are necessarily larger.</option>
+      <option value="Segz">shorter decimal numbers are necessarily larger.</option>
+      <option value="Negz">decimal numbers less than 1.0 are less than zero.</option>
+      <option value="Pegz">the numbers on the left and the right of the decimal point are separate and independent.</option>
+      <option value="Regz">decimal numbers behave the same way as whole numbers.</option>
+      <option value="Backwardz">the instructions are backwards, for example they list smallest to largest when the instructions call for largest to shortest.</option>
+      <option value="NegPosz">negative numbers are positive.</option>
+      <option value="Custom" id="custom-option">(Define a custom misconception):</option>
+    </select>
+    <br>
+    <input type="text" id="custom-sample" placeholder="Type your own misconception" style="display:none;">
+    <br>
+
+  
+  <textarea class="mainPrompt" style="width:100%; min-height:100px; resize:vertical;" oninput="this.style.height='auto';this.style.height=(this.scrollHeight)+'px';">
+    4) Creates socratic dialogue yet is simple and straightforward enough that a middle-school level reading student could understand and answer. 5) Is NOT repetitive in concepts the student has already shown good understanding in, based on previous questions and answers.
+
+    Keep your response below 300 characters.
+  </textarea>
+  <br><br>
+
+  <!--would like to make these editable but parsing the json was a nightmare-->
+  <i>(Examples. Making these editable was tough due to json parsing)</i>
+  <br>
+  <h class="examplePrompt" style="width:100%; min-height:100px; resize:vertical;" oninput="this.style.height='auto';this.style.height=(this.scrollHeight)+'px';">
+    {
+      role: "user",
+      content: `Here is some JSON data: {number1: 2.54, number2: 5.49, carry: [0, 1, 1, 0], ans: [0, 8, 0, 3], reflection_question: "How did you add the hundredths columns when their sum was more than 10?", student_response: "I carried the 1 from the 13 to the next column and put the 3 in that column."}`,
+    }
+  </h>
+  <br>
+  <h class="examplePrompt" style="width:100%; min-height:100px; resize:vertical;" oninput="this.style.height='auto';this.style.height=(this.scrollHeight)+'px';">
+    {
+      role: "assistant",
+      content: "1Great job! Looks like you got how to add decimals really well!.",
+    }
+  </h>
+  <br>
+  <h class="examplePrompt" style="width:100%; min-height:100px; resize:vertical;" oninput="this.style.height='auto';this.style.height=(this.scrollHeight)+'px';">
+  {
+    role: "user",
+    content: `Here is some JSON data: {number1: 2.54, number2: 5.49, carry: [0, 1, 1, 0], ans: [0, 8, 0, 3], reflection_question: "How did you add the hundredths columns when their sum was more than 10?", student_response: "They add to 13 so the 13 just becomes 3 for that column."}`,
+  }
+  </h>
+  <br>
+  <h class="examplePrompt" style="width:100%; min-height:100px; resize:vertical;" oninput="this.style.height='auto';this.style.height=(this.scrollHeight)+'px';">
+  {
+    role: "assistant",
+    content: "0You're right that the 3 is then put in the hundredths column, but what about the 10? Try again with this in mind.",
+  }
+  <br>
+  </h>
+        
+  <br><br>
+  <i><b>(Construct problem state json object)</b></i>
+  <br>
+  <h id="problemStatePrompt">
+  <br>
+
+  {number1: <input id="number1" type="text" style="display:inline;" value="3.5">,<br>
+  number2: <input id="number2" type="text" style="display:inline;" value="5.6">,<br>
+  student_carry: <input id="studentCarry" type="text" style="display:inline;" value="0">,<br>
+  student_ans: <input id="studentAns" type="text" style="display:inline;" value="8.11">,<br>
+  reflection_questions: <input id="reflectionQuestions" type="text" style="display:inline;">,<br>
+  student_answers: <input id="studentAnswers" type="text" style="display:inline;">}</h>
+
+  <br><br>
+  <button type="button" id="send-btn">Enter</button>
+
+  <table id="history-table" border="1" style="margin-top: 30px; width: 100%; border-collapse: collapse;">
+    <thead>
+      <tr>
+        <th>Model</th>
+        <th>Prompt</th>
+        <th>Response</th>
+        <th>Time Elapsed</th>
+      </tr>
+    </thead>
+    <tbody>
+      <!-- Rows will be added dynamically -->
+    </tbody>
+  </table>
+
+  
+  <script src="{{ url_for('static', filename='adding.js') }}"></script>
+</body>
+</html>
