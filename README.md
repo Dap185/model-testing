@@ -30,11 +30,11 @@ You need to make a .env file in the root of the project with `OPENAI_API_KEY`, `
 2. http://127.0.0.1:5000/adding lets you test the adding prompts as they exist in DP
 3. http://127.0.0.1:5000/numberline lets you test the numberline prompts as they exist in DP
 
+## Getting the data
+It will make a file in the project called data.csv
 
 ## TODO
 
-1. Add a few more models
+1. Draw up interfaces for other decimal point level types (3 others)
 
-2. Draw up interfaces for other decimal point level types (3 others)
-
-3. Add tokens analytics (for cost analysis)
+2. Add tokens analytics (for cost analysis)
