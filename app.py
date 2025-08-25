@@ -111,14 +111,27 @@ def anthropic_routine(api_key, model, prompt):
     """Call Anthropic API with the provided model and prompt."""
     client = Anthropic(api_key=api_key)
     try:
-        start_time = time.time()
-        response = client.messages.create(
-            model=model,
-            max_tokens=1000,
-            system=prompt[0]['content'] if isinstance(prompt[0], dict) else prompt[0],
-            temperature=0.7,
-            messages=prompt[1:],
-        )
+        
+        if(len(prompt) > 1):
+            start_time = time.time()
+            response = client.messages.create(
+                model=model,
+                max_tokens=1000,
+                system=prompt[0]['content'] if isinstance(prompt[0], dict) else prompt[0],
+                temperature=0.7,
+                messages=prompt[1:] if len(prompt) > 1 else []
+            )
+        elif len(prompt) == 1:
+            start_time = time.time()
+            response = client.messages.create(
+                model=model,
+                max_tokens=1000,
+                temperature=0.7,
+                messages=prompt
+            )
+        else:
+            return jsonify({'error': 'No prompt provided for Anthropic'}), 400
+
         end_time = time.time()
         time_elapsed = end_time - start_time
         text_response = "".join(
@@ -164,7 +177,6 @@ def gemini_routine(api_key, model, prompt):
 
 
 def record_data(response):
-    print(f"recording data to CSV: {response}")
     """Record the response data to a CSV file."""
     if not os.path.exists(CSV_FILE):
         df = pd.DataFrame(columns=['model', 'prompt', 'response', 'time_elapsed'])

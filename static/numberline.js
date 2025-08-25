@@ -116,7 +116,7 @@ function constructPrompt() {
       content: `Here is some JSON data: {number: ${problemStatePromptInputs[0]}, reflection_questions: ${problemStatePromptInputs[1]}, student_answers: ${problemStatePromptInputs[2]}}`
     }];
     
-    console.log([].concat(systemPrompt, examplesPrompt, problemStatePrompt));
+    // console.log([].concat(systemPrompt, examplesPrompt, problemStatePrompt));
     return [].concat(systemPrompt, examplesPrompt, problemStatePrompt);
 
 }
