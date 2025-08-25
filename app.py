@@ -18,7 +18,8 @@ import ollama
 
 # Set globals
 CSV_FILE = './data.csv'
-LOCAL_MODEL_PREFIXES = ["llama", "gemma", "qwen", "phi"]
+LOCAL_MODEL_PREFIXES = ["llama", "gemma", "qwen", "phi", "deepseek", "llava", ]
+# TODO: add function to scrape https://ollama.com/models for more prefixes
 
 """Initialize Flask app"""
 app = Flask(__name__, static_folder='static', template_folder='templates')
@@ -178,15 +179,21 @@ def ollama_routine(model, prompt):
     start_ollama_server()
     wait_for_ollama()
     start_model_if_needed(model) 
+
+    # check formatting b/c ollama just wants the prompt text
+    if isinstance(prompt, list):
+        prompt_text = "\n".join([f"{m['role']}: {m['content']}" for m in prompt])
+    else:
+        prompt_text = prompt
     
     start_time = time.time()
-    response = ollama.generate(model=model, prompt=prompt)
+    response = ollama.generate(model=model, prompt=prompt_text)
     end_time = time.time()
     time_elapsed = end_time - start_time
     print("Ollama Response:", response['response'])
     return {  
         'model': model,
-        'prompt': prompt,
+        'prompt': prompt_text,
         'response': response['response'],
         'time_elapsed': time_elapsed
     }, 200
