@@ -1,0 +1,16 @@
+name: model-testing
+channels:
+  - defaults
+  - conda-forge
+dependencies:
+  - python=3.10
+  - pip
+  - pandas
+  - pip:
+      - flask
+      - flask-cors
+      - requests
+      - python-dotenv
+      - openai
+      - anthropic
+      - ollama

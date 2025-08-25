@@ -4,6 +4,8 @@ from flask_cors import CORS
 
 
 import time
+import subprocess
+import requests
 import os
 import pandas as pd
 
@@ -12,9 +14,11 @@ from dotenv import load_dotenv
 
 from openai import OpenAI
 from anthropic import Anthropic, HUMAN_PROMPT, AI_PROMPT
+import ollama
 
-#set your output csv file
+# Set globals
 CSV_FILE = './data.csv'
+LOCAL_MODEL_PREFIXES = ["llama", "gemma", "qwen", "phi"]
 
 """Initialize Flask app"""
 app = Flask(__name__, static_folder='static', template_folder='templates')
@@ -59,10 +63,15 @@ def test_prompt():
         api_key = os.getenv('ANTHROPIC_API_KEY')
     elif model.startswith('gemini'):
         api_key = os.getenv('GEMINI_API_KEY')
+    elif is_local_model(model): # run on ollama
+        api_key = None # no key needed, open source model to be run locally
     else:
         return jsonify({'error': f'Model not found {model}'}), 500
-    if not api_key:
+    
+    # Only require API key for cloud-hosted models
+    if model.startswith(('gpt', 'claude', 'gemini')) and not api_key:
         return jsonify({'error': 'Key not found in env'}), 500
+
 
     if model.startswith('gpt'):
         response, status = openai_routine(api_key, model, prompt)
@@ -71,6 +80,8 @@ def test_prompt():
     elif model.startswith('gemini'):
         # Placeholder for Gemini API call
         response, status = gemini_routine(api_key, model, prompt)
+    elif is_local_model(model):
+        response, status = ollama_routine(model, prompt)
     else:
         return jsonify({'error': f'Model not found {model}'}), 500
     print(f"recording data, response was {response}")
@@ -78,9 +89,9 @@ def test_prompt():
 
     return jsonify(response), status
 
-
-
-
+def is_local_model(model: str) -> bool:
+    """Check if this model should be run locally via Ollama."""
+    return any(model.startswith(prefix) for prefix in LOCAL_MODEL_PREFIXES)
 
 def openai_routine(api_key, model, prompt):
     """Call OpenAI API with the provided model and prompt."""
@@ -137,9 +148,6 @@ def anthropic_routine(api_key, model, prompt):
 
 
 
-
-
-
 def gemini_routine(api_key, model, prompt):
     """Call gemini api with the provided model and prompt"""
     client = OpenAI(
@@ -162,6 +170,59 @@ def gemini_routine(api_key, model, prompt):
     }, 200
 
 
+
+def ollama_routine(model, prompt):
+    """Call ollama locally with the provided model and prompt"""
+
+    # ensure ollama is running at routine call + model is ready
+    start_ollama_server()
+    wait_for_ollama()
+    start_model_if_needed(model) 
+    
+    start_time = time.time()
+    response = ollama.generate(model=model, prompt=prompt)
+    end_time = time.time()
+    time_elapsed = end_time - start_time
+    print("Ollama Response:", response['response'])
+    return {  
+        'model': model,
+        'prompt': prompt,
+        'response': response['response'],
+        'time_elapsed': time_elapsed
+    }, 200
+
+def is_ollama_running():
+    try:
+        # `pgrep` returns 0 if a process is found
+        subprocess.run(["pgrep", "ollama"], check=True, stdout=subprocess.DEVNULL)
+        return True
+    except subprocess.CalledProcessError:
+        return False
+
+def start_ollama_server():
+    if not is_ollama_running():
+        print("Starting Ollama server...")
+        subprocess.Popen(["ollama", "serve"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    else:
+        print("Ollama server already running.")
+
+def wait_for_ollama(timeout=5):
+    """Wait until the Ollama local server is responding."""
+    url = "http://localhost:11434/api/generate"
+    start = time.time()
+    while time.time() - start < timeout:
+        try:
+            requests.get(url)
+            return True
+        except requests.ConnectionError:
+            time.sleep(0.1)
+    raise RuntimeError("Ollama server did not start in time")
+
+def start_model_if_needed(model):
+    installed = subprocess.run(["ollama", "list"], capture_output=True, text=True)
+    if model not in installed.stdout:
+        print(f"Pulling model {model}...")
+        subprocess.run(["ollama", "pull", model], check=True)
 
 def record_data(response):
     print(f"recording data to CSV: {response}")
