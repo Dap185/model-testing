@@ -16,6 +16,9 @@ from openai import OpenAI
 from anthropic import Anthropic, HUMAN_PROMPT, AI_PROMPT
 import ollama
 
+import json
+import random
+
 # Set globals
 CSV_FILE = './data.csv'
 LOCAL_MODEL_PREFIXES = ["llama", "gemma", "qwen", "phi", "deepseek", "llava", ]
@@ -42,6 +45,45 @@ def adding():
 @app.route('/numberline')
 def numberline():
     return render_template('numberline.html')
+ 
+@app.route('/interface')
+def interface():
+    return render_template('interface.html')
+
+def call_model_with_prompt(model, prompt):
+    """
+    Generic function to call any model with a prompt.
+    Returns (response_dict, status_code) tuple.
+    """
+    # get API key based on model type
+    api_key = ''
+    response = ''
+    if model.startswith('gpt'):
+        api_key = os.getenv('OPENAI_API_KEY')
+    elif model.startswith('claude'):
+        api_key = os.getenv('ANTHROPIC_API_KEY')
+    elif model.startswith('gemini'):
+        api_key = os.getenv('GEMINI_API_KEY')
+    elif is_local_model(model): # run on ollama
+        api_key = None  # no key needed, open source model to be run locally
+    else:
+        return jsonify({'error': f'Model not found {model}'}), 500
+    
+    # only require API key for cloud-hosted models
+    if model.startswith(('gpt', 'claude', 'gemini')) and not api_key:
+        return jsonify({'error': 'Key not found in env'}), 500
+
+    # use appropriate model handler routine
+    if model.startswith('gpt'):
+        return openai_routine(api_key, model, prompt)
+    elif model.startswith('claude'):
+        return anthropic_routine(api_key, model, prompt)
+    elif model.startswith('gemini'):
+        return gemini_routine(api_key, model, prompt)
+    elif is_local_model(model):
+        return ollama_routine(model, prompt)
+    else:
+        return jsonify({'error': f'Model not found {model}'}), 500
 
 @app.route('/api/testPrompt', methods=['POST'])
 def test_prompt():
@@ -56,40 +98,161 @@ def test_prompt():
     if not model:
         return jsonify({'error': 'No model provided'}), 400
     
-    api_key = ''
-    response = ''
-    if model.startswith('gpt'):
-        api_key = os.getenv('OPENAI_API_KEY')
-    elif model.startswith('claude'):
-        api_key = os.getenv('ANTHROPIC_API_KEY')
-    elif model.startswith('gemini'):
-        api_key = os.getenv('GEMINI_API_KEY')
-    elif is_local_model(model): # run on ollama
-        api_key = None # no key needed, open source model to be run locally
-    else:
-        return jsonify({'error': f'Model not found {model}'}), 500
-    
-    # Only require API key for cloud-hosted models
-    if model.startswith(('gpt', 'claude', 'gemini')) and not api_key:
-        return jsonify({'error': 'Key not found in env'}), 500
+    response, status = call_model_with_prompt(model, prompt)
 
-
-    if model.startswith('gpt'):
-        response, status = openai_routine(api_key, model, prompt)
-    elif model.startswith('claude'):
-        response, status = anthropic_routine(api_key, model, prompt)
-    elif model.startswith('gemini'):
-        # Placeholder for Gemini API call
-        response, status = gemini_routine(api_key, model, prompt)
-    elif is_local_model(model):
-        response, status = ollama_routine(model, prompt)
-    else:
-        return jsonify({'error': f'Model not found {model}'}), 500
     print(f"recording data, response was {response}")
     record_data(response)
 
     return jsonify(response), status
 
+@app.route('/interface/generate', methods=['POST'])
+def generate_interface():
+    """Endpoint to generate interface code with a specified model."""
+    data = request.get_json(force = True)
+    
+    description = data.get('description', '')
+    if not description:
+        return jsonify({'error': 'No interface description provided'}), 400
+
+    model = data.get('model', '')
+    if not model:
+        return jsonify({'error': 'No model provided'}), 400
+    
+    # get RAG context from examples
+    print("Checking for additional context")
+    context = get_interface_context()
+    
+    # create prompt for interface generation
+    print("Creating interface prompt")
+    interface_prompt = create_interface_prompt(description, context)
+    
+    response, status = call_model_with_prompt(model, interface_prompt)
+
+    response['response'] = clean_html_response(response['response']) # try to remove any non-code portion of response
+        
+    print(f"recording data, response was {response}")
+    record_data(response)
+
+    return jsonify(response), status
+
+def clean_html_response(response_text):
+    """Simple HTML extraction - just remove common prefixes/suffixes."""
+    text = response_text.strip()
+    
+    # Remove common prefixes
+    prefixes_to_remove = [
+        "Here's the HTML code:",
+        "Here's your interface:",
+        "```html",
+        "```"
+    ]
+    
+    for prefix in prefixes_to_remove:
+        if text.startswith(prefix):
+            text = text[len(prefix):].strip()
+    
+    # Remove common suffixes
+    if text.endswith("```"):
+        text = text[:-3].strip()
+    
+    return text
+
+def get_interface_context():
+    """Load interface examples for RAG context."""
+    try:
+        # load interface examples if CSV exists
+        examples = []
+        if os.path.exists('data/ctat_interfaces.csv'):
+            df = pd.read_csv('data/ctat_interfaces.csv')
+            # sample a few examples for context
+            sample_size = min(3, len(df))
+            examples = df.sample(n=sample_size).to_dict('records')
+            print("Interface examples found")
+        
+        # load component library if it exists
+        components = []
+        if os.path.exists('data/ctat_components.csv'):
+            comp_df = pd.read_csv('data/ctat_components.csv')
+            components = comp_df.to_dict('records')
+            print("CTAT components found")
+
+        return {
+            'examples': examples,
+            'components': components
+        }
+    except Exception as e:
+        print(f"Error loading interface context: {e}")
+        return {'examples': [], 'components': []}
+
+def create_interface_prompt(description, context):
+    """Create a prompt for interface generation with RAG context."""
+    
+    context_text = ""
+    if context['examples']:
+        context_text += "\nHere are some example interfaces for reference:\n"
+        for i, example in enumerate(context['examples'][:3]):
+            context_text += f"\nExample {i+1}:\nDescription: {example.get('description', 'N/A')}\n"
+            if 'html_content' in example:
+                context_text += f"HTML: {example['html_content'][:200]}...\n"
+    
+    if context['components']:
+        context_text += "\nYou should use one of these available UI components where applicable:\n"
+        for comp in context['components'][:5]:
+            context_text += f"- {comp.get('name', 'Unknown')}: {comp.get('description', 'N/A')}\n"
+    
+    prompt = [
+        {
+            "role": "system",
+            "content": f"""You are an expert at generating educational web interfaces using CMU's Cognitive Tutor Authoring Tools (CTAT). 
+            Create complete, functional HTML with embedded CSS and JavaScript for a CTAT interface.
+
+            Guidelines:
+            - Generate complete, self-contained HTML files
+            - Include CSS styling using a <style> tag for an attractive, educational interface
+            - Add basic JS using a <script> tag for interactivity where appropriate
+            - Focus on educational best practices (clear instructions, feedback, etc.)
+            - Make interfaces responsive and accessible
+            - Use semantic HTML
+            - Provide no other information beyond the code itself
+
+            {context_text}
+            """
+        },
+        {
+            "role": "user", 
+            "content": f"Create a complete HTML interface for: {description}"
+        }
+    ]
+    
+    print(prompt)
+    return prompt
+
+def record_interface_data(response):
+    """Record interface generation data to CSV."""
+    interface_csv = './data/interface_data.csv'
+    
+    if not os.path.exists(interface_csv):
+        df = pd.DataFrame(columns=['model', 'description', 'interface_type', 'response', 'time_elapsed'])
+    else:
+        df = pd.read_csv(interface_csv)
+
+    new_data = {
+        'model': response['model'],
+        'description': response.get('description', ''),
+        'interface_type': response.get('interface_type', 'unknown'),
+        'response': response['response'],
+        'time_elapsed': response.get('time_elapsed', None)
+    }
+    
+    df.loc[len(df)] = new_data
+    df.to_csv(interface_csv, index=False)
+
+
+    return render_template('interface.html')
+
+# 
+# IDENTIFYING MODEL + RUNNING APPROPRIATE ROUTINE & SUBROUTINES
+# 
 def is_local_model(model: str) -> bool:
     """Check if this model should be run locally via Ollama."""
     return any(model.startswith(prefix) for prefix in LOCAL_MODEL_PREFIXES)
@@ -116,8 +279,6 @@ def openai_routine(api_key, model, prompt):
     except Exception as e:
         print("Error with OpenAI API:", str(e))
         return jsonify({'error': str(e)}), 500
-
-
 
 def anthropic_routine(api_key, model, prompt):
     """Call Anthropic API with the provided model and prompt."""
@@ -160,8 +321,6 @@ def anthropic_routine(api_key, model, prompt):
         print("Error with Anthropic API:", str(e))
         return jsonify({'error': str(e)}), 500
 
-
-
 def gemini_routine(api_key, model, prompt):
     """Call gemini api with the provided model and prompt"""
     client = OpenAI(
@@ -182,8 +341,6 @@ def gemini_routine(api_key, model, prompt):
         'response': response.choices[0].message.content,
         'time_elapsed': time_elapsed
     }, 200
-
-
 
 def ollama_routine(model, prompt):
     """Call ollama locally with the provided model and prompt"""
@@ -244,6 +401,9 @@ def start_model_if_needed(model):
         print(f"Pulling model {model}...")
         subprocess.run(["ollama", "pull", model], check=True)
 
+#
+# SAVE RESPONSES TO .CSV
+#
 def record_data(response):
     """Record the response data to a CSV file."""
     if not os.path.exists(CSV_FILE):
