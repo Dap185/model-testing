@@ -205,21 +205,33 @@ def gemini_routine(api_key, model, prompt):
         api_key=api_key,
         base_url="https://generativelanguage.googleapis.com/v1beta/openai/"
     )
-    #get start and end time for analytics
-    start_time = time.time()
-    response = client.chat.completions.create(
-        model=model,
-        messages=prompt
-    )
-    end_time = time.time()
-    time_elapsed = end_time - start_time
-    print("Gemini Response:", response.choices[0].message.content)
-    return {  
-        'model': model,
-        'prompt': prompt,
-        'response': response.choices[0].message.content,
-        'time_elapsed': time_elapsed
-    }, 200
+    try:
+
+        if len(prompt) == 0:
+            return jsonify({"error in anthropic API: no prompt"}), 400
+        elif len(prompt) == 1 and isinstance(prompt[0], dict):
+            prompt[0]["role"] = "user"
+
+        start_time = time.time()
+        response = client.chat.completions.create(
+            model=model,
+            messages = prompt
+        )
+        end_time = time.time()
+        time_elapsed = end_time - start_time
+        print("Gemini Response:", response.choices[0].message.content)
+        return {  
+            'model': model,
+            'prompt': prompt,
+            'response': response.choices[0].message.content,
+            'time_elapsed': time_elapsed
+        }, 200
+    
+    except Exception as e:
+        print("Error with gemini api: ", str(e))
+        return jsonify({"error": str(e)}), 500
+
+
 
 #
 # OLLAMA

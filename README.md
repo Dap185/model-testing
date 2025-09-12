@@ -38,10 +38,16 @@ It will make a file in the project called data.csv
 ## Socratic Dialogue Prompt Requirements
 [Link to Bruce's work on prompting](https://docs.google.com/document/d/188tmspawsaUifEHmj2Lyi82yMnl3q_l3nsOZiMUy-Uo/edit?usp=sharing)
 
+## Data
+Here: (you need permission)
+https://drive.google.com/drive/folders/1zUpZa6zoxDyQGMOC8RY7M2X0Zp-mMl3W
+
 ## TODO
 
-1. Draw up interfaces for other decimal point level types (3 others)
+1. Make seperate endpoints for different lines of models
 
-2. Add tokens analytics (for cost analysis)
+2. Draw up interfaces for other decimal point level types (3 others)
 
-3. Deploy online for anyone to use
+3. Add tokens analytics (for cost analysis)
+
+4. Deploy online for anyone to use
