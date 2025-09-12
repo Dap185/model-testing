@@ -153,28 +153,35 @@ def anthropic_routine(api_key, model, prompt):
     """Call Anthropic API with the provided model and prompt."""
     client = Anthropic(api_key=api_key)
     try:
-        #assume first entry in messages will be system prompt
-        if(len(prompt) >= 1):
-            #get start and end time for analytics
-            start_time = time.time()
+        #assume for current data collection it's just system prompt
+        #todo make more robust later
+
+        #get start and end time for analytics
+        start_time = time.time()
+        #only system prompt
+        if len(prompt) == 1:
             response = client.messages.create(
                 model=model,
                 max_tokens=1000,
                 system=prompt[0]['content'] if isinstance(prompt[0], dict) else prompt[0],
                 temperature=0.7,
-                messages=prompt[1:] if len(prompt) > 1 else []
             )
-        elif len(prompt) == 1:
-            start_time = time.time()
+
+        #system + conversation
+        elif len(prompt > 1):
+            system_prompt = prompt[0]['content'] if isinstance(prompt[0], dict) else prompt[0]
+            messages = prompt[1:]  # everything after the first
+
             response = client.messages.create(
                 model=model,
                 max_tokens=1000,
+                system=system_prompt,
+                messages=messages,
                 temperature=0.7,
-                messages=prompt
             )
-        else:
+        else: 
             return jsonify({'error': 'No prompt provided for Anthropic'}), 400
-
+        
         end_time = time.time()
         time_elapsed = end_time - start_time
         text_response = "".join(
