@@ -209,6 +209,10 @@ def gemini_routine(api_key, model, prompt):
 
         if len(prompt) == 0:
             return jsonify({"error in anthropic API: no prompt"}), 400
+        
+        #Gemini, like Anthropic, also does not like a single prompt that is a system prompt.
+        #Instead we just cast it to user prompt.
+        #Since it's the only prompt in the set, it should not cause issues of priority.  
         elif len(prompt) == 1 and isinstance(prompt[0], dict):
             prompt[0]["role"] = "user"
 
