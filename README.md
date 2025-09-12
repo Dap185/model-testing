@@ -33,7 +33,7 @@ It will make a file in the project called data.csv
 1. http://127.0.0.1:5000/custom lets you test whatever prompts you want
 2. http://127.0.0.1:5000/adding lets you test the adding prompts as they exist in DP
 3. http://127.0.0.1:5000/numberline lets you test the numberline prompts as they exist in Decimal Point
-4. http://127.0.0.1:5000/socraticPromptRequirements provides an interface for testing based on the requirements for socratic dialogue that Dr. McLaren laid out in September 2025. (See blow)
+4. http://127.0.0.1:5000/socraticPromptRequirements provides an interface for testing based on the requirements for socratic dialogue that Dr. McLaren laid out in September 2025. (See below)
 
 ## Socratic Dialogue Prompt Requirements
 [Link to Bruce's work on prompting](https://docs.google.com/document/d/188tmspawsaUifEHmj2Lyi82yMnl3q_l3nsOZiMUy-Uo/edit?usp=sharing)
