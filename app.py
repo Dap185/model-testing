@@ -168,7 +168,7 @@ def anthropic_routine(api_key, model, prompt):
             )
 
         #system + conversation
-        elif len(prompt > 1):
+        elif len(prompt) > 1:
             system_prompt = prompt[0]['content'] if isinstance(prompt[0], dict) else prompt[0]
             messages = prompt[1:]  # everything after the first
 
