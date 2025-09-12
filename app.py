@@ -149,26 +149,30 @@ def openai_routine(api_key, model, prompt):
         print("Error with OpenAI API:", str(e))
         return jsonify({'error': str(e)}), 500
 
+
 def anthropic_routine(api_key, model, prompt):
     """Call Anthropic API with the provided model and prompt."""
     client = Anthropic(api_key=api_key)
     try:
-        #get start and end time for analytics
-        start_time = time.time()
-        #only system prompt
-        if len(prompt) == 1:
+        #exactly one prompt provided, other APIs accept it as "role": "system"
+        #Anthropic API straight up does not let you JUST have a system prompt. 
+        #Instead we just cast it to user prompt.
+        #Since it's the only prompt in the set, it should not cause issues of priority.  
+        if len(prompt) == 1 and isinstance(prompt[0], dict):
+            prompt[0]["role"] = "user"
+            start_time = time.time()
             response = client.messages.create(
                 model=model,
                 max_tokens=1000,
-                system=prompt[0]['content'] if isinstance(prompt[0], dict) else prompt[0],
                 temperature=0.7,
+                messages= prompt
             )
 
         #system + conversation
         elif len(prompt) > 1:
             system_prompt = prompt[0]['content'] if isinstance(prompt[0], dict) else prompt[0]
-            messages = prompt[1:]  # everything after the first
-
+            messages = prompt[1:]  # everything after the first prompt
+            start_time = time.time()
             response = client.messages.create(
                 model=model,
                 max_tokens=1000,
@@ -289,6 +293,7 @@ def start_model_if_needed(model):
 #
 def record_data(response):
     #DBG
+    print(response)
     print(json.dumps(response))
     """Record the response data to a CSV file."""
     if not os.path.exists(CSV_FILE):
