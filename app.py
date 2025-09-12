@@ -153,9 +153,6 @@ def anthropic_routine(api_key, model, prompt):
     """Call Anthropic API with the provided model and prompt."""
     client = Anthropic(api_key=api_key)
     try:
-        #assume for current data collection it's just system prompt
-        #todo make more robust later
-
         #get start and end time for analytics
         start_time = time.time()
         #only system prompt
