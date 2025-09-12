@@ -2,7 +2,6 @@ from flask import Flask, request, jsonify, render_template
 #permit cross-origin requests from frontend
 from flask_cors import CORS
 
-
 import time
 import subprocess
 import requests
@@ -30,6 +29,10 @@ CORS(app, origins=["http://127.0.0.1:5500", "http://localhost:5500"])
 
 load_dotenv()
 
+#
+# ENDPOINTS FOR ALL UNIQUE PAGES
+#
+
 @app.route('/')
 def home():
     return render_template('home.html')
@@ -50,9 +53,39 @@ def numberline():
 def interface():
     return render_template('interface.html')
 
+@app.route('/socraticPromptRequirements')
+def socraticPromptRequirements():
+    return render_template('socraticPromptRequirements.html')
+
+#
+# MAIN ENDPOINT FOR TESTING PROMPTS
+# 
+
+@app.route('/api/testPrompt', methods=['POST'])
+def test_prompt():
+    """Endpoint to test a prompt with a specified model."""
+    data = request.get_json(force=True)
+    
+    prompt = data.get('messages', '')
+    if not prompt:
+        return jsonify({'error': 'No prompt provided'}), 400
+
+    model = data.get('model', '')
+    if not model:
+        return jsonify({'error': 'No model provided'}), 400
+    
+    response, status = call_model_with_prompt(model, prompt)
+
+    print(f"recording data, response was {response}")
+    record_data(response)
+
+    return jsonify(response), status
+
+
 def call_model_with_prompt(model, prompt):
     """
     Generic function to call any model with a prompt.
+    Helper function to api handler
     Returns (response_dict, status_code) tuple.
     """
     # get API key based on model type
@@ -85,25 +118,196 @@ def call_model_with_prompt(model, prompt):
     else:
         return jsonify({'error': f'Model not found {model}'}), 500
 
-@app.route('/api/testPrompt', methods=['POST'])
-def test_prompt():
-    """Endpoint to test a prompt with a specified model."""
-    data = request.get_json(force=True)
+
+
+# 
+# IDENTIFYING MODEL + RUNNING APPROPRIATE ROUTINE & SUBROUTINES
+# ACTUAL API REQUESTS HERE
+# 
+
+def openai_routine(api_key, model, prompt):
+    """Call OpenAI API with the provided model and prompt."""
+    client = OpenAI(api_key=api_key)
+    try:
+        #get start and end time for analytics
+        start_time = time.time()
+        response = client.chat.completions.create(
+            model=model,
+            messages=prompt
+        )
+        end_time = time.time()
+        time_elapsed = end_time - start_time
+
+        print("OpenAI Response:", response.choices[0].message.content)
+        return {
+            'model': model,
+            'prompt': prompt,
+            'response': response.choices[0].message.content,
+            'time_elapsed': time_elapsed
+        }, 200
+    except Exception as e:
+        print("Error with OpenAI API:", str(e))
+        return jsonify({'error': str(e)}), 500
+
+def anthropic_routine(api_key, model, prompt):
+    """Call Anthropic API with the provided model and prompt."""
+    client = Anthropic(api_key=api_key)
+    try:
+        #assume first entry in messages will be system prompt
+        if(len(prompt) >= 1):
+            #get start and end time for analytics
+            start_time = time.time()
+            response = client.messages.create(
+                model=model,
+                max_tokens=1000,
+                system=prompt[0]['content'] if isinstance(prompt[0], dict) else prompt[0],
+                temperature=0.7,
+                messages=prompt[1:] if len(prompt) > 1 else []
+            )
+        elif len(prompt) == 1:
+            start_time = time.time()
+            response = client.messages.create(
+                model=model,
+                max_tokens=1000,
+                temperature=0.7,
+                messages=prompt
+            )
+        else:
+            return jsonify({'error': 'No prompt provided for Anthropic'}), 400
+
+        end_time = time.time()
+        time_elapsed = end_time - start_time
+        text_response = "".join(
+            block.text for block in response.content if block.type == "text"
+        )
+        print("Anthropic Response:", text_response)
+        return {
+            'model': model,
+            'prompt': prompt,
+            'response': text_response,
+            'time_elapsed': time_elapsed
+        }, 200
+    except Exception as e:
+        print("Error with Anthropic API:", str(e))
+        return jsonify({'error': str(e)}), 500
+
+def gemini_routine(api_key, model, prompt):
+    """Call gemini api with the provided model and prompt"""
+    client = OpenAI(
+        api_key=api_key,
+        base_url="https://generativelanguage.googleapis.com/v1beta/openai/"
+    )
+    #get start and end time for analytics
+    start_time = time.time()
+    response = client.chat.completions.create(
+        model=model,
+        messages=prompt
+    )
+    end_time = time.time()
+    time_elapsed = end_time - start_time
+    print("Gemini Response:", response.choices[0].message.content)
+    return {  
+        'model': model,
+        'prompt': prompt,
+        'response': response.choices[0].message.content,
+        'time_elapsed': time_elapsed
+    }, 200
+
+#
+# OLLAMA
+#
+
+def is_local_model(model: str) -> bool:
+    """Check if this model should be run locally via Ollama."""
+    return any(model.startswith(prefix) for prefix in LOCAL_MODEL_PREFIXES)
+
+def ollama_routine(model, prompt):
+    """Call ollama locally with the provided model and prompt"""
+
+    # ensure ollama is running at routine call + model is ready
+    start_ollama_server()
+    wait_for_ollama()
+    start_model_if_needed(model) 
+
+    # check formatting b/c ollama just wants the prompt text
+    if isinstance(prompt, list):
+        prompt_text = "\n".join([f"{m['role']}: {m['content']}" for m in prompt])
+    else:
+        prompt_text = prompt
     
-    prompt = data.get('messages', '')
-    if not prompt:
-        return jsonify({'error': 'No prompt provided'}), 400
+    start_time = time.time()
+    response = ollama.generate(model=model, prompt=prompt_text)
+    end_time = time.time()
+    time_elapsed = end_time - start_time
+    print("Ollama Response:", response['response'])
+    return {  
+        'model': model,
+        'prompt': prompt_text,
+        'response': response['response'],
+        'time_elapsed': time_elapsed
+    }, 200
 
-    model = data.get('model', '')
-    if not model:
-        return jsonify({'error': 'No model provided'}), 400
+def is_ollama_running():
+    try:
+        # `pgrep` returns 0 if a process is found
+        subprocess.run(["pgrep", "ollama"], check=True, stdout=subprocess.DEVNULL)
+        return True
+    except subprocess.CalledProcessError:
+        return False
+
+def start_ollama_server():
+    if not is_ollama_running():
+        print("Starting Ollama server...")
+        subprocess.Popen(["ollama", "serve"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    else:
+        print("Ollama server already running.")
+
+def wait_for_ollama(timeout=5):
+    """Wait until the Ollama local server is responding."""
+    url = "http://localhost:11434/api/generate"
+    start = time.time()
+    while time.time() - start < timeout:
+        try:
+            requests.get(url)
+            return True
+        except requests.ConnectionError:
+            time.sleep(0.1)
+    raise RuntimeError("Ollama server did not start in time")
+
+def start_model_if_needed(model):
+    installed = subprocess.run(["ollama", "list"], capture_output=True, text=True)
+    if model not in installed.stdout:
+        print(f"Pulling model {model}...")
+        subprocess.run(["ollama", "pull", model], check=True)
+
+#
+# SAVE RESPONSES TO .CSV
+#
+def record_data(response):
+    #DBG
+    print(json.dumps(response))
+    """Record the response data to a CSV file."""
+    if not os.path.exists(CSV_FILE):
+        df = pd.DataFrame(columns=['model', 'prompt', 'response', 'time_elapsed'])
+    else:
+        df = pd.read_csv(CSV_FILE)
+
+    new_data = {
+        'model': response['model'],
+        'prompt': response['prompt'],
+        'response': response['response'],
+        'time_elapsed': response.get('time_elapsed', None)
+    }
     
-    response, status = call_model_with_prompt(model, prompt)
+    df.loc[len(df)] = new_data
+    
+    # Save to CSV
+    df.to_csv(CSV_FILE, index=False)
 
-    print(f"recording data, response was {response}")
-    record_data(response)
 
-    return jsonify(response), status
+#
+# INTERFACE GENERATION
+#
 
 @app.route('/interface/generate', methods=['POST'])
 def generate_interface():
@@ -250,178 +454,6 @@ def record_interface_data(response):
 
     return render_template('interface.html')
 
-# 
-# IDENTIFYING MODEL + RUNNING APPROPRIATE ROUTINE & SUBROUTINES
-# 
-def is_local_model(model: str) -> bool:
-    """Check if this model should be run locally via Ollama."""
-    return any(model.startswith(prefix) for prefix in LOCAL_MODEL_PREFIXES)
-
-def openai_routine(api_key, model, prompt):
-    """Call OpenAI API with the provided model and prompt."""
-    client = OpenAI(api_key=api_key)
-    try:
-        start_time = time.time()
-        response = client.chat.completions.create(
-            model=model,
-            messages=prompt
-        )
-        end_time = time.time()
-        time_elapsed = end_time - start_time
-
-        print("OpenAI Response:", response.choices[0].message.content)
-        return {
-            'model': model,
-            'prompt': prompt,
-            'response': response.choices[0].message.content,
-            'time_elapsed': time_elapsed
-        }, 200
-    except Exception as e:
-        print("Error with OpenAI API:", str(e))
-        return jsonify({'error': str(e)}), 500
-
-def anthropic_routine(api_key, model, prompt):
-    """Call Anthropic API with the provided model and prompt."""
-    client = Anthropic(api_key=api_key)
-    try:
-        
-        if(len(prompt) > 1):
-            start_time = time.time()
-            response = client.messages.create(
-                model=model,
-                max_tokens=1000,
-                system=prompt[0]['content'] if isinstance(prompt[0], dict) else prompt[0],
-                temperature=0.7,
-                messages=prompt[1:] if len(prompt) > 1 else []
-            )
-        elif len(prompt) == 1:
-            start_time = time.time()
-            response = client.messages.create(
-                model=model,
-                max_tokens=1000,
-                temperature=0.7,
-                messages=prompt
-            )
-        else:
-            return jsonify({'error': 'No prompt provided for Anthropic'}), 400
-
-        end_time = time.time()
-        time_elapsed = end_time - start_time
-        text_response = "".join(
-            block.text for block in response.content if block.type == "text"
-        )
-        print("Anthropic Response:", text_response)
-        return {
-            'model': model,
-            'prompt': prompt,
-            'response': text_response,
-            'time_elapsed': time_elapsed
-        }, 200
-    except Exception as e:
-        print("Error with Anthropic API:", str(e))
-        return jsonify({'error': str(e)}), 500
-
-def gemini_routine(api_key, model, prompt):
-    """Call gemini api with the provided model and prompt"""
-    client = OpenAI(
-        api_key=api_key,
-        base_url="https://generativelanguage.googleapis.com/v1beta/openai/"
-    )
-    start_time = time.time()
-    response = client.chat.completions.create(
-        model=model,
-        messages=prompt
-    )
-    end_time = time.time()
-    time_elapsed = end_time - start_time
-    print("Gemini Response:", response.choices[0].message.content)
-    return {  
-        'model': model,
-        'prompt': prompt,
-        'response': response.choices[0].message.content,
-        'time_elapsed': time_elapsed
-    }, 200
-
-def ollama_routine(model, prompt):
-    """Call ollama locally with the provided model and prompt"""
-
-    # ensure ollama is running at routine call + model is ready
-    start_ollama_server()
-    wait_for_ollama()
-    start_model_if_needed(model) 
-
-    # check formatting b/c ollama just wants the prompt text
-    if isinstance(prompt, list):
-        prompt_text = "\n".join([f"{m['role']}: {m['content']}" for m in prompt])
-    else:
-        prompt_text = prompt
-    
-    start_time = time.time()
-    response = ollama.generate(model=model, prompt=prompt_text)
-    end_time = time.time()
-    time_elapsed = end_time - start_time
-    print("Ollama Response:", response['response'])
-    return {  
-        'model': model,
-        'prompt': prompt_text,
-        'response': response['response'],
-        'time_elapsed': time_elapsed
-    }, 200
-
-def is_ollama_running():
-    try:
-        # `pgrep` returns 0 if a process is found
-        subprocess.run(["pgrep", "ollama"], check=True, stdout=subprocess.DEVNULL)
-        return True
-    except subprocess.CalledProcessError:
-        return False
-
-def start_ollama_server():
-    if not is_ollama_running():
-        print("Starting Ollama server...")
-        subprocess.Popen(["ollama", "serve"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    else:
-        print("Ollama server already running.")
-
-def wait_for_ollama(timeout=5):
-    """Wait until the Ollama local server is responding."""
-    url = "http://localhost:11434/api/generate"
-    start = time.time()
-    while time.time() - start < timeout:
-        try:
-            requests.get(url)
-            return True
-        except requests.ConnectionError:
-            time.sleep(0.1)
-    raise RuntimeError("Ollama server did not start in time")
-
-def start_model_if_needed(model):
-    installed = subprocess.run(["ollama", "list"], capture_output=True, text=True)
-    if model not in installed.stdout:
-        print(f"Pulling model {model}...")
-        subprocess.run(["ollama", "pull", model], check=True)
-
-#
-# SAVE RESPONSES TO .CSV
-#
-def record_data(response):
-    """Record the response data to a CSV file."""
-    if not os.path.exists(CSV_FILE):
-        df = pd.DataFrame(columns=['model', 'prompt', 'response', 'time_elapsed'])
-    else:
-        df = pd.read_csv(CSV_FILE)
-
-    new_data = {
-        'model': response['model'],
-        'prompt': response['prompt'],
-        'response': response['response'],
-        'time_elapsed': response.get('time_elapsed', None)
-    }
-    
-    df.loc[len(df)] = new_data
-    
-    # Save to CSV
-    df.to_csv(CSV_FILE, index=False)
 
 if __name__ == '__main__':
     app.run(debug=True)

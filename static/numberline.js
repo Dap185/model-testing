@@ -48,6 +48,10 @@ window.addEventListener("DOMContentLoaded", function () {
   document.getElementById("send-btn").addEventListener("click", sendRequest);
 });
 
+/**
+ * Sends request to backend with model and prompt
+ * On receiving a good response, update the table on the interface 
+ */
 async function sendRequest() {
 
   let data = {
