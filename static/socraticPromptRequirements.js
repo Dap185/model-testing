@@ -38,10 +38,44 @@ async function sendRequest() {
     const result = await response.json();
     console.log("Response:", result);
     updateTable(result); // Call updateTable with the result
+    const elements = document.querySelectorAll(".response"); // replace with your selector
+    const firstEmpty = Array.from(elements).find(el => el.textContent.trim() === "");
+
+    if (firstEmpty) {
+      firstEmpty.textContent = result.response;
+    } else {
+      console.log("No empty element found");
+    }
   } catch (error) {
     console.error("Fetch error:", error);
     document.getElementById("response").innerText = "Error: " + error.message;
   }
+}
+
+function buildConversation(userprompts, responses) {
+  const conversation = [];
+  const maxLen = Math.max(userprompts.length, responses.length);
+
+  for (let i = 0; i < maxLen; i++) {
+    const userEl = userprompts[i];
+    const resEl = responses[i];
+
+    if (resEl && resEl.textContent.trim() !== "") {
+      conversation.push({
+        role: "assistant",
+        content: resEl.textContent.trim()
+      });
+    }
+
+    if (userEl && userEl.value.trim() !== "") {
+      conversation.push({
+        role: "user",
+        content: userEl.value.trim()
+      });
+    }
+  }
+
+  return conversation;
 }
 
 
@@ -51,7 +85,7 @@ async function sendRequest() {
  */
 function constructPrompt() {
   //grab all configuration from the interface 
-  const staticPromptComponents = document.querySelectorAll("p");
+  const staticPromptComponents = document.querySelectorAll(".staticPromptComponents");
   const mathProblem = document.getElementById("mathProblem").value;
   const mathProblemAnswer = document.getElementById("mathProblemAnswer").value;
   const correctFirstTime = document.getElementById("recentGuess").value === "correct";
@@ -60,7 +94,7 @@ function constructPrompt() {
   const misconceptions = document.getElementById("misconceptions").value;
 
   //put together into prompt string
-  const prompt =
+  const systemPrompt =
   `${staticPromptComponents[0].textContent}`/*can you engage me in a socratic dialogue, assuming the following:*/
    + `${staticPromptComponents[1].textContent}` /*I just finished the*/
    + `${mathProblem}` /*sequence problem 0.0, 0.4, 0.8*/
@@ -76,9 +110,14 @@ function constructPrompt() {
    + `${staticPromptComponents[6].textContent}` /* If the student answers with an incorret number or something even vaguely related to decimal numbers...*/
    + `${staticPromptComponents[7].textContent}` /*This is a middle school student so keep the language simple.*/
   
+   const userPrompts = document.querySelectorAll(".userPrompt");
+   const responses = document.querySelectorAll(".response");
+   
+   const dialogue = buildConversation(userPrompts, responses);
+
   //make it json
    return [{
     role: "system",
-    content: prompt
-   }];
+    content: systemPrompt
+   }].concat(dialogue);
 }

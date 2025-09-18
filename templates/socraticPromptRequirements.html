@@ -35,11 +35,11 @@
   </select>
   <br><br>
   <h2>1) Prompt to engage in Socatic Dialogue</h1>
-    <p id="p1">
+    <p class="staticPromptComponents" id="p1">
       Can you engage me in a socratic dialogue, assuming the following: 
     </p>
   <h2>2) Report the just-solved problem: </h2>
-  <p id="p2">
+  <p class="staticPromptComponents" id="p2">
     I just finished the 
   </p>
     <i><b>(Configure Problem type): </b></i><br>
@@ -53,31 +53,31 @@
       <br/>
 
     <i><b>(Write math problem): </b></i><br>
-      <textarea id="mathProblem"></textarea>
-      <p id="p3">By correctly answering</p>
+      <textarea id="mathProblem">0.0, 0.4, 0.8,</textarea>
+      <p class="staticPromptComponents" id="p3">By correctly answering</p>
       <i><b>(Write answer): </b></i><br>
-      <textarea id="mathProblemAnswer"></textarea>
+      <textarea id="mathProblemAnswer">1.2</textarea>
       <input type="text" id="custom-sample" placeholder="Type your own misconception" style="display:none;">
       <br>
   
   <h2>3) Report the most recent error made, if any:</h2>
   <select id="recentGuess" name="sample">
+      <option value="incorrect">Before getting it correct, I made the erroneous guess</option>
       <option value="correct">I got it correct the first time</option>
-      <option value="incorrect">Before getting it correct, I made the erroneous</option>
   </select><br/>
   <i><b>(Optional) Record incorrect guess: </b></i><br>
-  <textarea id="recentIncorrectGuess"></textarea>
+  <textarea id="recentIncorrectGuess">First: 0.0, 0.4, 0.8, 12; Last: 0.0, 0.4, 0.8, .12</textarea>
 
   <h2>4) Report the student's current skills evaluation, using Bayesian Knowledge Tracing (BKT):</h2>
-  <p id="p4"> My level of skills is as follows:</p>
-  <textarea id="skills"></textarea>
+  <p class="staticPromptComponents" id="p4"> My level of skills is as follows:</p>
+  <textarea id="skills">poor in sorting decimals, average in adding decimals, good in finishing a decimal sequence</textarea>
 
   <h2>5) Report the student's displayed misconceptions:</h2>
-  <p id="p5"> The misconceptions I have shown while learning are, </p>
-  <textarea id="misconceptions"></textarea>
+  <p class="staticPromptComponents" id="p5"> The misconceptions I have shown while learning are, </p>
+  <textarea id="misconceptions">5 times ‘longer decimals are larger', 4 times 'shorter decimals are larger</textarea>
 
   <h2>6) Provide guidance on how to conduct the socratic dialogue:</h2>
-  <p id="p6"> "Taking my level of skills and prior misconceptions into account, ask a conceptual or procedural question -- wait for my answer.
+  <p class="staticPromptComponents" id="p6"> "Taking my level of skills and prior misconceptions into account, ask a conceptual or procedural question -- wait for my answer.
   Do not label the question.<br/>
   In asking questions, strive to make me comply with the four requisites for conceptual change proposed by Posner, Strike, Hewson and Gertzog (1982). Namely: (1) Make students dissatisfied with their previous concept; (2) Have a new intelligible concept to replace the previous one; (3) This new concept must be plausible and analogous to the previous one; (4) The new concept must be more fruitful and effective than the previous concept. <br />
   Also, apply the 5 principles of Stevens & Collins, 1977 
@@ -89,15 +89,24 @@
   </p>
 
   <h2>7) Provide guidance on what to do if the student provides off-topic and/or abusive answers.</h2>
-  <p id="p7">"If the student answers with an incorrect number or something even vaguely related to decimal numbers, point out to them that the answer does not follow from the question. <br/>
+  <p class="staticPromptComponents" id="p7">"If the student answers with an incorrect number or something even vaguely related to decimal numbers, point out to them that the answer does not follow from the question. <br/>
   If the student provides answers that do not follow from the questions or completely off-topic answers, i.e., answers that have nothing to do with mathematics, tell them they should read the questions more carefully and/or stay on task before asking the next question.  <br/>
   If the student provides abusive or aggressive answers, tell them they should not do that. However, when responding, forget off-topic and/or abusive answers from previous questions — only correct them for their most recent off-topic or abusive answer.  <br/>
   In the final summary, if they were at all answering questions that weren’t asked or answering in an off-topic and/or abusive way throughout the dialogue, empathize with them. However, do not suggest that they can stop working altogether or switch topics." <br/>
   </p>
 
   <h2>8) Provide guidance on keeping the language at an appropriate level:</h2>
-  <p id="p8"> This is a middle school student so keep the language simple.</p>
-    
+  <p class="staticPromptComponents" id="p8"> This is a middle school student so keep the language simple.</p>
+   
+  <h2>9) Subsequent conversation</h2>
+  <h3 class="response"></h3>
+  <textarea class="userPrompt"></textarea>
+  <h3 class="response"></h3>
+  <textarea class="userPrompt"></textarea>
+  <h3 class="response"></h3>
+  <textarea class="userPrompt"></textarea>
+  <h3 class="response"></h3>
+  
   <br><br>
   <button type="button" id="send-btn">Enter</button> 
 
